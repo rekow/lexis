@@ -178,6 +178,7 @@ Lexer.prototype.setLexicon = function (lexicon) {
  * Processes the input stream, matching and tokenizing left to right in a single pass.
  * @expose
  * @param {(string|Array.<string>)=} source String to set as source and lex.
+ * @return {Future}
  */
 Lexer.prototype.lex = function (source) {
   var lexer = this,

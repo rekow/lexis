@@ -174,3 +174,8 @@ lexis.Future;
  * @typedef {function(new: Lexicon)}
  */
 lexis.Lexicon;
+
+/**
+ * @typedef {function(new: Token)}
+ */
+lexis.Token;

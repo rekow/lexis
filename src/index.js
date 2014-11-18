@@ -18,9 +18,10 @@ var lexis = function (lexicon) {
 lexis.Future = require('./Future');
 
 /** @expose */
-lexis.Lexicon = Lexicon;
+lexis.Token = require('./Token');
 
-lexis({});
+/** @expose */
+lexis.Lexicon = Lexicon;
 
 module.exports = lexis;
 
@@ -28,3 +29,5 @@ if (typeof window !== 'undefined') {
   /** @expose */
   window.lexis = lexis;
 }
+
+return lexis({});

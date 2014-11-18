@@ -34,10 +34,15 @@ lexis.Lexer = Lexer;
 lexis({});
 
 
-module.exports = lexis;
-
-
 if (typeof window !== 'undefined') {
   /** @expose */
   window.lexis = lexis;
 }
+
+if (typeof module === 'object' && typeof module.exports === 'object') {
+  /** @expose */
+  module.exports = lexis;
+}
+
+if (typeof define === 'function')
+  define('lexis', lexis);

@@ -15,3 +15,8 @@ var module;
  * @typedef {function(string): Object}
  */
 var require;
+
+/**
+ * @typedef {function(string, *)}
+ */
+var define;

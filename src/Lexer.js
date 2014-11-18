@@ -111,10 +111,11 @@ var Lexer = function (lexicon, source) {
 /**
  * Resets the lexer state.
  * @expose
+ * @param {boolean=} keepLexicon If true, will preserve the current lexicon.
  * @return {Lexer}
  */
-Lexer.prototype.reset = function () {
-  Lexer.call(this);
+Lexer.prototype.reset = function (keepLexicon) {
+  Lexer.call(this, keepLexicon === true ? this.lexicon : undefined);
   return this;
 };
 

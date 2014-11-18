@@ -6,7 +6,7 @@
 /**
  * @constructor
  */
-var Future =function () {
+var Future = function () {
   /**
    * @type {string}
    */

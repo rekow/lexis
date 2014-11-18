@@ -171,11 +171,21 @@ var lexis = function () {};
 lexis.Future;
 
 /**
+ * @typedef {function(new: Token)}
+ */
+lexis.Token;
+
+/**
+ * @typedef {function(new: LexError)}
+ */
+lexis.LexError;
+
+/**
  * @typedef {function(new: Lexicon)}
  */
 lexis.Lexicon;
 
 /**
- * @typedef {function(new: Token)}
+ * @typedef {function(new: Lexer)}
  */
-lexis.Token;
+lexis.Lexer;

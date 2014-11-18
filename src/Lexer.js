@@ -119,14 +119,6 @@ Lexer.prototype.reset = function () {
 };
 
 /**
- * Exit the lex loop and fulfills the result with the error.
- * @protected
- */
-Lexer.prototype.fail = function () {
-  this._result.fulfill(false, this.error);
-};
-
-/**
  * Sets the passed text as the lexing source, breaking into lines if necessary, and initializes
  * the character stream.
  * @expose
@@ -147,7 +139,7 @@ Lexer.prototype.setSource = function (source) {
     this._stream = this._lines.shift().split('');
   } else {
     this._lines = [];
-    this._stream = source;
+    this._stream = source.slice();
   }
 };
 
@@ -194,17 +186,17 @@ Lexer.prototype.lex = function (source) {
 
   current = this._current || '';
 
-  switch('' + this._state) {
-  case '-1':
+  switch(this._state) {
+  case -1:
     this.fail();
     return this._result;
 
-  case '0':
+  case 0:
     this.tokens.push(new Token('EOF', '', this._lineno));
     this._result.fulfill(this.tokens);
     return this._result;
 
-  case '1':
+  case 1:
     next = this._next || this._stream.shift();
 
     if (!next) {
@@ -227,7 +219,7 @@ Lexer.prototype.lex = function (source) {
 
     break;
 
-  case '2':
+  case 2:
     _valid = this._valid;
 
     this._match = this.lexicon.match(this._valid, this._current);
@@ -243,7 +235,7 @@ Lexer.prototype.lex = function (source) {
 
     break;
 
-  case '3':
+  case 3:
     next = this._stream.shift();
 
     if (next) {
@@ -262,7 +254,7 @@ Lexer.prototype.lex = function (source) {
 
     break;
 
-  case '4':
+  case 4:
     this.tokens.push(new Token(
       this._previous[0].type,
       this._current.slice(0, -1),
@@ -271,7 +263,7 @@ Lexer.prototype.lex = function (source) {
     this._state = 7;
     break;
 
-  case '5':
+  case 5:
     this.tokens.push(new Token(
       this._previous[0].type,
       /** @type {string} */(this._current),
@@ -279,13 +271,13 @@ Lexer.prototype.lex = function (source) {
     this._state = 7;
     break;
 
-  case '6':
+  case 6:
     this._previous = this._match;
     this._match = [];
     this._state = 3;
     break;
 
-  case '7':
+  case 7:
     this._previous = [];
     this._current = '';
     this._state = 1;
@@ -301,6 +293,15 @@ Lexer.prototype.lex = function (source) {
   }, 0);
 
   return this._result;
+};
+
+
+/**
+ * Exit the lex loop and fulfills the result with the error.
+ * @protected
+ */
+Lexer.prototype.fail = function () {
+  this._result.fulfill(false, this.error);
 };
 
 module.exports = Lexer;

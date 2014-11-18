@@ -14,6 +14,7 @@ var lexis = function (lexicon) {
   return new Lexer(lexicon);
 };
 
+
 /** @expose */
 lexis.Future = require('./Future');
 
@@ -21,13 +22,22 @@ lexis.Future = require('./Future');
 lexis.Token = require('./Token');
 
 /** @expose */
-lexis.Lexicon = Lexicon;
+lexis.LexError = require('./LexError');
+
+/** @expose */
+lexis.Lexicon = require('./Lexicon');
+
+/** @expose */
+lexis.Lexer = Lexer;
+
+
+lexis({});
+
 
 module.exports = lexis;
+
 
 if (typeof window !== 'undefined') {
   /** @expose */
   window.lexis = lexis;
 }
-
-return lexis({});

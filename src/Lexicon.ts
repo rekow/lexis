@@ -84,7 +84,7 @@ export class Lexicon {
    */
   filter(rules: Rule[] | null, str: string): Rule[] {
     return (rules || this.getRules(str)).filter((rule) =>
-      rule.complex ? this.match([rule], str).length > 0 : rule.source.indexOf(str) > -1);
+      rule.complex ? this.match([rule], str).length > 0 : rule.source.startsWith(str));
   }
 
   /**

@@ -138,6 +138,15 @@ describe.each(impls)('$name', (impl: Impl) => {
       expect(types(l.filter(null, '1'))).toEqual(['DIGITS']);
     });
 
+    // filter() kept any simple rule whose source *contained* the string, so lexing read ahead
+    // further than any rule could match before failing or backing up.
+    bug('legacy')('filter() keeps only simple rules that start with the string', () => {
+      const l = new lexis.Lexicon({ AAB: 'aab', BXBA: 'bxba' });
+      expect(types(l.filter(null, 'ab'))).toEqual([]);
+      expect(types(l.filter(null, 'ba'))).toEqual([]);
+      expect(types(l.filter(null, 'aa'))).toEqual(['AAB']);
+    });
+
     it('match() and filter() narrow an explicit rule list', () => {
       const l = lexicon();
       const only = l.getRules('(').slice(1);
@@ -237,6 +246,11 @@ describe.each(impls)('$name', (impl: Impl) => {
       it('fails when complex rules exist but none match', async () => {
         const error = errorOf(await lex({ DIGITS: 'RE::\\d+' }, 'x'));
         expect([error.message, error.lineno]).toEqual(['Unrecognized token: x', 1]);
+      });
+
+      bug('legacy')('fails as soon as no rule can continue a partial match', async () => {
+        const error = errorOf(await lex({ BXBA: 'bxba' }, 'ba'));
+        expect([error.message, error.lineno]).toEqual(['Unrecognized token: ba', 1]);
       });
 
       it('fails when input ends inside a partial match', async () => {

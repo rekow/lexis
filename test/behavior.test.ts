@@ -272,11 +272,33 @@ describe.each(impls)('$name', (impl: Impl) => {
 
     describe('known bugs (pinned, fixed after review)', () => {
       // Backtracking only rewinds one character, so a longer failed lookahead is swallowed.
-      bug('legacy', 'current')('backtracks more than one character', async () => {
+      bug('legacy')('backtracks more than one character', async () => {
         expect(tokensOf(await lex({ A: 'a', ABCD: 'abcd', B: 'b', C: 'c' }, 'abc'))).toEqual([
           'A<"a">:1',
           'B<"b">:1',
           'C<"c">:1',
+          'EOF<"">:1',
+        ]);
+      });
+
+      // At the end of a line the whole lookahead is emitted as the last match's value.
+      bug('legacy')('backtracks to the last match at the end of a line', async () => {
+        expect(tokensOf(await lex({ A: 'a', ABC: 'abc', B: 'b' }, 'ab\nab'))).toEqual([
+          'A<"a">:1',
+          'B<"b">:1',
+          'A<"a">:2',
+          'B<"b">:2',
+          'EOF<"">:2',
+        ]);
+      });
+
+      bug('legacy')('backtracks again while re-reading backed-up input', async () => {
+        const rules = { A: 'a', AXYZW: 'axyzw', X: 'x', Y: 'y', Z: 'z' };
+        expect(tokensOf(await lex(rules, 'axyz'))).toEqual([
+          'A<"a">:1',
+          'X<"x">:1',
+          'Y<"y">:1',
+          'Z<"z">:1',
           'EOF<"">:1',
         ]);
       });

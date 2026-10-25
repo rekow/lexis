@@ -27,8 +27,11 @@ export class Lexer {
   protected _valid!: Rule[];
   protected _match!: Rule[];
   protected _current!: string | null;
+  /** Input read past the end of the last token, re-read before {@link Lexer#_stream}. */
   protected _next!: string | null;
   protected _previous!: Rule[];
+  /** The text <code>_previous</code> matched: the longest token found so far. */
+  protected _matched!: string;
   protected _lines!: string[];
   protected _stream!: string[];
   protected _lineno!: number;
@@ -130,7 +133,7 @@ export class Lexer {
       return this._result;
 
     case 1:
-      next = this._next || this._stream.shift();
+      next = this.read();
 
       if (!next) {
         if (this._lines.length) {
@@ -142,7 +145,6 @@ export class Lexer {
         break;
       }
 
-      this._next = next;
       this._current = current + next;
       this._valid = this.lexicon!.getRules(next);
       this._state = this._valid.length ? 2 : -1;
@@ -167,14 +169,12 @@ export class Lexer {
       break;
 
     case 3:
-      next = this._stream.shift();
+      next = this.read();
 
       if (next) {
-        this._next = next;
-        this._current = this._current + this._next;
+        this._current = this._current + next;
         this._state = 2;
       } else {
-        this._next = null;
         this._state = this._match.length ? 6 :
           this._previous.length ? 5 :
           -1;
@@ -186,24 +186,19 @@ export class Lexer {
       break;
 
     case 4:
-      this.tokens.push(new Token(
-        this._previous[0]!.type,
-        this._current!.slice(0, -1),
-        this._lineno));
-      this._next = this._current!.slice(-1);
-      this._state = 7;
-      break;
-
     case 5:
+      // Emit the longest match and back up to re-read whatever was read past it.
       this.tokens.push(new Token(
         this._previous[0]!.type,
-        this._current!,
+        this._matched,
         this._lineno));
+      this._next = this._current!.slice(this._matched.length) + (this._next || '') || null;
       this._state = 7;
       break;
 
     case 6:
       this._previous = this._match;
+      this._matched = this._current!;
       this._match = [];
       this._state = 3;
       break;
@@ -227,6 +222,19 @@ export class Lexer {
   }
 
   /**
+   * Reads the next character of the current line, taking backed-up input first.
+   */
+  protected read(): string | undefined {
+    const next = this._next;
+
+    if (!next)
+      return this._stream.shift();
+
+    this._next = next.length > 1 ? next.slice(1) : null;
+    return next.charAt(0);
+  }
+
+  /**
    * Exit the lex loop and rejects the result with the error.
    */
   protected fail(): void {
@@ -246,6 +254,7 @@ export class Lexer {
     this._current = null;
     this._next = null;
     this._previous = [];
+    this._matched = '';
     this._lines = [];
     this._stream = [];
     this._lineno = 0;

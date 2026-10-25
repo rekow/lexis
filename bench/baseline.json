@@ -1,0 +1,57 @@
+{
+  "meta": {
+    "impl": "legacy",
+    "commit": "e779d25",
+    "dirty": true,
+    "date": "2026-10-25T23:00:23.535Z",
+    "node": "v24.21.0",
+    "platform": "darwin arm64",
+    "cpu": "Apple M2"
+  },
+  "results": {
+    "readme-9": {
+      "chars": 9,
+      "tokens": 4,
+      "digest": "89231b4149b8",
+      "runs": 20,
+      "wallMs": 50.68452100000004,
+      "cpuMs": 0.7304999999999999,
+      "charsPerSec": 178,
+      "maxLoopBlockMs": 2.158591,
+      "retainedKB": 3.3
+    },
+    "code-200": {
+      "chars": 200,
+      "tokens": 169,
+      "digest": "e6424906b127",
+      "runs": 5,
+      "wallMs": 1599.312958,
+      "cpuMs": 11.036,
+      "charsPerSec": 125,
+      "maxLoopBlockMs": 1.667071,
+      "retainedKB": 19.3
+    },
+    "code-1k-20lines": {
+      "chars": 1019,
+      "tokens": 841,
+      "digest": "29b81ce9d941",
+      "runs": 5,
+      "wallMs": 7885.575791999996,
+      "cpuMs": 42.134,
+      "charsPerSec": 129,
+      "maxLoopBlockMs": 3.010559,
+      "retainedKB": 50.5
+    },
+    "code-1k-1line": {
+      "chars": 1000,
+      "tokens": 842,
+      "digest": "3d1e39dcd556",
+      "runs": 5,
+      "wallMs": 7925.937458999993,
+      "cpuMs": 53.204,
+      "charsPerSec": 126,
+      "maxLoopBlockMs": 2.099199,
+      "retainedKB": 50.4
+    }
+  }
+}

@@ -8,7 +8,14 @@
     "email": "d@davidrekow.com",
     "url": "http://davidrekow.com"
   },
-  "keywords": ["lex", "lexer", "lexis", "token", "tokenize", "tokens"],
+  "keywords": [
+    "lex",
+    "lexer",
+    "lexis",
+    "token",
+    "tokenize",
+    "tokens"
+  ],
   "homepage": "https://github.com/davidrekow/lexis",
   "bugs": "https://github.com/davidrekow/lexis/issues",
   "repository": {
@@ -17,13 +24,18 @@
   },
   "main": "src/index.js",
   "scripts": {
-    "test": "make test"
+    "test": "vitest run",
+    "bench": "node --expose-gc bench/run.mjs"
   },
   "engines": {
     "node": "0.10.x"
   },
   "devDependencies": {
-    "closure-compiler-stream": "0.1"
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@types/node": "^26.6.5",
+    "publint": "^0.3.25",
+    "tsdown": "^0.23.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
   }
 }
-

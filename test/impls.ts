@@ -3,6 +3,7 @@
  * and the current one, so the port can be checked against the original.
  */
 import { createRequire } from 'node:module';
+import lexisCurrent from '../src/index';
 
 export type LexResult = { tokens: string[] } | { error: any };
 
@@ -17,7 +18,7 @@ const require = createRequire(import.meta.url);
 
 export const legacy: Impl = {
   name: 'legacy',
-  lexis: require('../src/index.js'),
+  lexis: require('./legacy/index.js'),
   lex: (lexer, source) =>
     new Promise((resolve) => {
       let future;
@@ -32,4 +33,16 @@ export const legacy: Impl = {
     }),
 };
 
-export const impls: Impl[] = [legacy];
+export const current: Impl = {
+  name: 'current',
+  lexis: lexisCurrent,
+  lex: async (lexer, source) => {
+    try {
+      return { tokens: (await lexer.lex(source)).map(String) };
+    } catch (error) {
+      return { error };
+    }
+  },
+};
+
+export const impls: Impl[] = [legacy, current];

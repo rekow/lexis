@@ -1,14 +1,19 @@
 /**
  * Lexer benchmark. Runs the same inputs against the legacy or current implementation.
  *
- *   node --expose-gc bench/run.mjs [legacy|current] [--save <file>] [--min-runs N] [--min-ms N]
+ *   node --expose-gc bench/run.mjs [legacy|current] [--save <file>] [--compare <file>]
+ *     [--fake-timers] [--min-runs N] [--min-ms N]
  *
  * `current` loads the built package (`npm run build` first). Token output is digested so runs across
  * implementations can be compared for identical results, not just speed.
+ *
+ * With real timers, wall time is dominated by one `setTimeout` per lexer step, and CPU time mostly
+ * measures event-loop wakeups, which drifts between sessions. `--fake-timers` runs scheduled steps
+ * synchronously instead, isolating the lexer's own compute.
  */
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
@@ -18,10 +23,12 @@ const flag = (name, fallback) => {
   const i = args.indexOf(name);
   return i === -1 ? fallback : args[i + 1];
 };
-const implName = args[0] && !args[0].startsWith('--') ? args[0] : 'current';
+const implName = args.find((a) => a === 'legacy' || a === 'current') ?? 'current';
 const minRuns = Number(flag('--min-runs', 5));
 const minMs = Number(flag('--min-ms', 1000));
 const savePath = flag('--save');
+const comparePath = flag('--compare');
+const fakeTimers = args.includes('--fake-timers');
 
 if (typeof globalThis.gc !== 'function') {
   console.error('Run with node --expose-gc for heap measurements.');
@@ -30,7 +37,7 @@ if (typeof globalThis.gc !== 'function') {
 
 const loaders = {
   legacy: async () => {
-    const lexis = createRequire(import.meta.url)('../src/index.js');
+    const lexis = createRequire(import.meta.url)('../test/legacy/index.js');
     const lex = (lexer, source) =>
       new Promise((resolve, reject) =>
         lexer.lex(source).then((tokens, error) => (tokens ? resolve(tokens) : reject(error))),
@@ -68,7 +75,15 @@ const median = (xs) => {
 const digest = (tokens) =>
   createHash('sha256').update(tokens.map(String).join('\n')).digest('hex').slice(0, 12);
 
-const { lexis, lex } = await loaders[implName]();
+const { lexis, lex: lexOnce } = await loaders[implName]();
+
+const pending = [];
+if (fakeTimers) globalThis.setTimeout = (fn) => void pending.push(fn);
+const lex = (lexer, source) => {
+  const result = lexOnce(lexer, source);
+  while (pending.length) pending.shift()();
+  return result;
+};
 
 async function measure({ rules, source }) {
   // Warm-up, and the reference output.
@@ -119,7 +134,7 @@ for (const c of CASES) {
   console.log(
     `${implName.padEnd(8)} ${c.name.padEnd(16)} ${String(r.chars).padStart(5)} chars  ` +
       `wall ${r.wallMs.toFixed(2).padStart(9)}ms  cpu ${r.cpuMs.toFixed(2).padStart(8)}ms  ` +
-      `${String(r.charsPerSec).padStart(9)} ch/s  block ${r.maxLoopBlockMs.toFixed(1).padStart(6)}ms  ` +
+      `${String(r.charsPerSec).padStart(9)} ch/s  block ${fakeTimers ? '   n/a' : r.maxLoopBlockMs.toFixed(1).padStart(6)}ms  ` +
       `heap ${String(r.retainedKB).padStart(7)}KB  [${r.digest}, ${r.tokens} tok, ${r.runs} runs]`,
   );
 }
@@ -128,6 +143,7 @@ if (savePath) {
   const git = (cmd) => execSync(`git ${cmd}`, { encoding: 'utf8' }).trim();
   const meta = {
     impl: implName,
+    timers: fakeTimers ? 'fake' : 'real',
     commit: git('rev-parse --short HEAD'),
     dirty: git('status --porcelain') !== '',
     date: new Date().toISOString(),
@@ -137,4 +153,20 @@ if (savePath) {
   };
   writeFileSync(savePath, JSON.stringify({ meta, results }, null, 2) + '\n');
   console.log(`saved ${savePath}`);
+}
+
+if (comparePath) {
+  const { meta, results: base } = JSON.parse(readFileSync(comparePath, 'utf8'));
+  if ((meta.timers ?? 'real') !== (fakeTimers ? 'fake' : 'real'))
+    console.log(`\nWARNING: ${comparePath} used ${meta.timers ?? 'real'} timers; this run did not.`);
+  const ratio = (a, b) => (b / a >= 10 ? `${Math.round(b / a)}x` : `${(b / a).toFixed(2)}x`);
+  console.log(`\nvs ${comparePath} (${meta.impl} @ ${meta.commit}; >1x = faster/smaller now)`);
+  for (const [name, r] of Object.entries(results)) {
+    const b = base[name];
+    if (!b) continue;
+    console.log(
+      `  ${name.padEnd(16)} wall ${ratio(r.wallMs, b.wallMs).padStart(7)}  cpu ${ratio(r.cpuMs, b.cpuMs).padStart(7)}  ` +
+        `heap ${ratio(r.retainedKB, b.retainedKB).padStart(6)}  output ${r.digest === b.digest ? 'identical' : 'DIFFERS'}`,
+    );
+  }
 }

@@ -46,11 +46,13 @@
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc -p . && tsc -p test",
+    "pretest": "npm run -s build",
     "test": "vitest run",
+    "check": "npm test && npm run -s typecheck && npm run -s check:package",
+    "check:package": "publint && attw --pack .",
     "bench": "node --expose-gc bench/run.mjs",
     "bench:compute": "node --expose-gc bench/run.mjs --fake-timers",
-    "check:package": "publint && attw --pack .",
-    "prepack": "npm run build"
+    "prepack": "npm run -s build"
   },
   "engines": {
     "node": ">=18"

@@ -1,14 +1,18 @@
 /**
- * Adapters that let one behavior suite run against both the legacy (Future-based) implementation
- * and the current one, so the port can be checked against the original.
+ * Adapters that let one behavior suite run against the legacy (Future-based) implementation, the
+ * current source, and the built ESM and CJS packages, so the port can be checked against the original
+ * and the published builds against the source.
  */
 import { createRequire } from 'node:module';
-import lexisCurrent from '../src/index';
+import lexisDistEsm from '../dist/index.mjs';
+import lexisSrc from '../src/index';
 
 export type LexResult = { tokens: string[] } | { error: any };
 
 export interface Impl {
-  name: 'legacy' | 'current';
+  name: string;
+  /** Which implementation the behavior comes from; pinned bugs are keyed on this. */
+  generation: 'legacy' | 'current';
   lexis: any;
   /** Lexes and normalizes the outcome; tokens are rendered with `Token#toString()`. */
   lex(lexer: any, source?: unknown): Promise<LexResult>;
@@ -18,6 +22,7 @@ const require = createRequire(import.meta.url);
 
 export const legacy: Impl = {
   name: 'legacy',
+  generation: 'legacy',
   lexis: require('./legacy/index.js'),
   lex: (lexer, source) =>
     new Promise((resolve) => {
@@ -33,9 +38,10 @@ export const legacy: Impl = {
     }),
 };
 
-export const current: Impl = {
-  name: 'current',
-  lexis: lexisCurrent,
+const current = (name: string, lexis: any): Impl => ({
+  name,
+  generation: 'current',
+  lexis,
   lex: async (lexer, source) => {
     try {
       return { tokens: (await lexer.lex(source)).map(String) };
@@ -43,6 +49,11 @@ export const current: Impl = {
       return { error };
     }
   },
-};
+});
 
-export const impls: Impl[] = [legacy, current];
+export const impls: Impl[] = [
+  legacy,
+  current('src', lexisSrc),
+  current('dist (esm)', lexisDistEsm),
+  current('dist (cjs)', require('../dist/index.cjs')),
+];

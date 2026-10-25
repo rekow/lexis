@@ -21,8 +21,9 @@ const errorOf = (r: LexResult) => {
 describe.each(impls)('$name', (impl: Impl) => {
   const { lexis } = impl;
   const lex = (rules: unknown, source?: unknown) => impl.lex(lexis(rules), source);
-  /** Marks a test as a pinned known bug for the given implementations. */
-  const bug = (...names: Impl['name'][]) => (names.includes(impl.name) ? it.fails : it);
+  /** Marks a test as a pinned known bug for the given implementation generations. */
+  const bug = (...generations: Impl['generation'][]) =>
+    generations.includes(impl.generation) ? it.fails : it;
 
   describe('lexis()', () => {
     it('exposes the public classes on the namespace', () => {
@@ -296,7 +297,7 @@ describe.each(impls)('$name', (impl: Impl) => {
 
       // Legacy returns the previous result, then crashes the process with an uncaught TypeError
       // when it re-fulfills the Future, so it can't run in-process.
-      (impl.name === 'legacy' ? it.skip : it.fails)('lexes again without reset()', async () => {
+      (impl.generation === 'legacy' ? it.skip : it.fails)('lexes again without reset()', async () => {
         const lexer = lexis(README_RULES);
         await impl.lex(lexer, 'a');
         expect(tokensOf(await impl.lex(lexer, 'b'))).toEqual(['ALPHANUM<"b">:1', 'EOF<"">:1']);

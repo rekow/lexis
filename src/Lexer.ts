@@ -36,6 +36,17 @@ function stockMatching(lexicon: Lexicon): boolean {
   return lexicon.match === Lexicon.prototype.match && lexicon.filter === Lexicon.prototype.filter;
 }
 
+/**
+ * Whether the lexer can take a lexicon's rules for a character from {@link Lexicon#candidates} instead
+ * of {@link Lexicon#getRules}: only if both are stock, and so is matching, so that an override is
+ * never handed the shared list.
+ */
+function stockRules(lexicon: Lexicon): boolean {
+  return lexicon.getRules === Lexicon.prototype.getRules &&
+    lexicon.candidates === Lexicon.prototype.candidates &&
+    stockMatching(lexicon);
+}
+
 export class Lexer {
   lexicon!: Lexicon | null;
   source!: Source | null;
@@ -207,7 +218,9 @@ export class Lexer {
       }
 
       this._current = current + next;
-      this._valid = this.lexicon!.getRules(next);
+      this._valid = stockRules(this.lexicon!) ?
+        this.lexicon!.candidates(next) :
+        this.lexicon!.getRules(next);
       this._state = this._valid.length ? 2 : -1;
 
       if (this._state === -1)

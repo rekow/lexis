@@ -30,17 +30,33 @@ export function matchesWhole(rule: Rule, str: string): boolean {
   return re.test(str) && re.lastIndex === str.length;
 }
 
+/**
+ * A cached {@link Lexicon#candidates} list, with the rule lists it was built from and their lengths
+ * at the time, to tell when it's stale.
+ */
+interface Candidates {
+  bucket: Rule[];
+  bucketLength: number;
+  complex: Rule[];
+  complexLength: number;
+  rules: Rule[];
+}
+
 export class Lexicon {
   /**
    * Rules bucketed by first character; complex (RegExp) rules live under <code>RE</code>.
    */
   protected rules: { RE: Rule[]; [key: string]: Rule[] };
 
+  /** @internal Cached {@link Lexicon#candidates} lists by character. */
+  protected _candidates: Map<string, Candidates>;
+
   /**
    * @param rules Rules map. See {@link Lexicon#define} for details.
    */
   constructor(rules?: Rules) {
     this.rules = { RE: [] };
+    this._candidates = new Map();
 
     if (rules)
       this.define(rules);
@@ -87,6 +103,40 @@ export class Lexicon {
       return [];
 
     return (this.rules[str.charAt(0)] || []).concat(this.rules.RE);
+  }
+
+  /**
+   * @internal Like {@link Lexicon#getRules} for one character, without building a new list each time:
+   * returns a cached or shared list that must not be modified. A cached list is rebuilt when the rule
+   * lists it came from are replaced or change length, as define() does; other in-place changes to
+   * <code>rules</code> aren't seen.
+   */
+  candidates(char: string): Rule[] {
+    const bucket = this.rules[char];
+    const complex = this.rules.RE;
+
+    if (!bucket)
+      return complex;
+
+    if (!complex.length)
+      return bucket;
+
+    let cached = this._candidates.get(char);
+
+    if (!cached ||
+        cached.bucket !== bucket || cached.bucketLength !== bucket.length ||
+        cached.complex !== complex || cached.complexLength !== complex.length) {
+      cached = {
+        bucket,
+        bucketLength: bucket.length,
+        complex,
+        complexLength: complex.length,
+        rules: bucket.concat(complex),
+      };
+      this._candidates.set(char, cached);
+    }
+
+    return cached.rules;
   }
 
   /**

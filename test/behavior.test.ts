@@ -315,6 +315,43 @@ describe.each(impls)('$name', (impl: Impl) => {
       });
     });
 
+    // The lexer caches each character's rules; the cache must notice when the rules change.
+    describe('after the lexicon changes', () => {
+      it('uses rules defined after lexing', async () => {
+        const lexicon = new lexis.Lexicon({ A: 'a', D: 'RE::\\d' });
+        const lexer = lexis(lexicon);
+        expect(tokensOf(await impl.lex(lexer, 'aa12'))).toEqual([
+          'A<"a">:1', 'A<"a">:1', 'D<"1">:1', 'D<"2">:1', 'EOF<"">:1',
+        ]);
+        lexicon.define({ AA: 'aa', N: 'RE::\\d+' });
+        expect(tokensOf(await impl.lex(lexer.reset(true), 'aa12'))).toEqual([
+          'AA<"aa">:1', 'N<"12">:1', 'EOF<"">:1',
+        ]);
+      });
+
+      // As a subclass editing its protected `rules` might.
+      it.each([
+        ['a bucket replaced, same size', (rules: any) => {
+          rules.a = new lexis.Lexicon({ X: 'a' }).rules.a;
+        }, ['X<"a">:1', 'D<"1">:1']],
+        ['a bucket added to', (rules: any) => {
+          rules.a.unshift(...new lexis.Lexicon({ X: 'a' }).rules.a);
+        }, ['X<"a">:1', 'D<"1">:1']],
+        ['complex rules replaced, same size', (rules: any) => {
+          rules.RE = new lexis.Lexicon({ W: 'RE::a\\d?' }).rules.RE;
+        }, ['W<"a1">:1']],
+        ['complex rules added to', (rules: any) => {
+          rules.RE.push(...new lexis.Lexicon({ W: 'RE::a\\d?' }).rules.RE);
+        }, ['W<"a1">:1']],
+      ])('sees direct edits to Lexicon#rules: %s', async (_, edit, expected) => {
+        const lexicon = new lexis.Lexicon({ A: 'a', D: 'RE::\\d' });
+        const lexer = lexis(lexicon);
+        expect(tokensOf(await impl.lex(lexer, 'a1'))).toEqual(['A<"a">:1', 'D<"1">:1', 'EOF<"">:1']);
+        edit(lexicon.rules);
+        expect(tokensOf(await impl.lex(lexer.reset(true), 'a1'))).toEqual([...expected, 'EOF<"">:1']);
+      });
+    });
+
     describe('errors', () => {
       it('fails when no rule can start with a character', async () => {
         const error = errorOf(await lex({ A: 'a' }, 'a\nax'));

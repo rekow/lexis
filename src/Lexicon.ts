@@ -15,14 +15,19 @@ export interface Rule {
   type: string;
   matcher: RegExp;
   complex: boolean;
+  /** @internal Sticky copy of <code>matcher</code>, created on first use. */
+  _whole?: RegExp;
 }
 
 /**
- * Whether a rule matches the whole of <code>str</code>.
+ * Whether a rule matches the whole of <code>str</code>: the leftmost match of <code>rule.matcher</code>
+ * starts at 0 and spans <code>str</code>. A sticky copy tests only position 0 and allocates no match
+ * array; its match at 0 is the same one <code>exec()</code> would find.
  */
 function matchesWhole(rule: Rule, str: string): boolean {
-  const matches = rule.matcher.exec(str);
-  return matches !== null && matches[0].length === str.length;
+  const re = rule._whole ??= new RegExp(rule.matcher.source, rule.matcher.flags.replace(/[gy]/g, '') + 'y');
+  re.lastIndex = 0;
+  return re.test(str) && re.lastIndex === str.length;
 }
 
 export class Lexicon {

@@ -7,9 +7,9 @@
  * `current` loads the built package (`npm run build` first). Token output is digested so runs across
  * implementations can be compared for identical results, not just speed.
  *
- * With real timers, wall time is dominated by one `setTimeout` per lexer step, and CPU time mostly
- * measures event-loop wakeups, which drifts between sessions. `--fake-timers` runs scheduled steps
- * synchronously instead, isolating the lexer's own compute.
+ * With real timers, legacy wall time is dominated by one `setTimeout` per lexer step, and its CPU time
+ * mostly measures event-loop wakeups, which drifts between sessions; current yields only every ~8 ms.
+ * `--fake-timers` runs scheduled steps synchronously instead, isolating the lexer's own compute.
  */
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';

@@ -3,14 +3,25 @@
  * can be verified against it. Known bugs are pinned with `it.fails` using the *correct* expectation,
  * so a fix flips them to passing and the suite asks for the marker to be removed.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { impls, type Impl, type LexResult } from './impls';
 
 const README_RULES = { LPAREN: '(', RPAREN: ')', ALPHANUM: 'RE::[a-zA-Z0-9]+' };
 const WS_RULES = { ...README_RULES, WS: 'RE::[ \\t]+' };
 
-/** A source that is still being lexed when lex() returns. */
+/** A source that is still being lexed when lex() returns, with {@link slowClock}. */
 const LONG = '(abc)'.repeat(50);
+/**
+ * Makes every slice of lexing overrun its time budget, so the lexer yields to the event loop at each
+ * clock check instead of finishing a short source in one go.
+ */
+const slowClock = () => {
+  let now = 0;
+  vi.spyOn(Date, 'now').mockImplementation(() => (now += 1000));
+};
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 /** Lets any steps already scheduled run. */
 const settled = () => new Promise((resolve) => setTimeout(resolve, 5));
 
@@ -29,7 +40,7 @@ describe.each(impls)('$name', (impl: Impl) => {
   /** Marks a test as a pinned known bug for the given implementation generations. */
   const bug = (...generations: Impl['generation'][]) =>
     generations.includes(impl.generation) ? it.fails : it;
-  /** For fixed bugs the legacy implementation can't run in-process. */
+  /** For behavior the legacy implementation lacks, or bugs it can't run in-process. */
   const skipLegacy = impl.generation === 'legacy' ? it.skip : it;
 
   describe('lexis()', () => {
@@ -237,6 +248,17 @@ describe.each(impls)('$name', (impl: Impl) => {
       expect(tokensOf(await impl.lex(lexer, 'b'))).toEqual(['ALPHANUM<"b">:1', 'EOF<"">:1']);
     });
 
+    skipLegacy('yields to the event loop while lexing a long source', async () => {
+      slowClock();
+      const lexer = lexis(README_RULES);
+      const result = lexer.lex(LONG);
+      const sofar = lexer.tokens.length;
+      expect(sofar).toBeGreaterThan(0);
+      const tokens = await result;
+      expect(tokens).toHaveLength(LONG.length / 5 * 3 + 1);
+      expect(sofar).toBeLessThan(tokens.length);
+    });
+
     it('drops the lexicon on reset()', () => {
       const lexer = lexis(README_RULES);
       lexer.reset();
@@ -403,6 +425,7 @@ describe.each(impls)('$name', (impl: Impl) => {
 
       // Legacy kept stepping the old lex against the reset state and failed the next lex.
       skipLegacy('stops an unfinished lex on reset(), rejecting its promise', async () => {
+        slowClock();
         const lexer = lexis(README_RULES);
         const first = impl.lex(lexer, LONG);
         lexer.reset(true);
@@ -415,6 +438,7 @@ describe.each(impls)('$name', (impl: Impl) => {
       });
 
       skipLegacy('starts over when given a new source while lexing', async () => {
+        slowClock();
         const lexer = lexis(README_RULES);
         const first = impl.lex(lexer, LONG);
         const second = impl.lex(lexer, '(b)');

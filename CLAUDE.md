@@ -15,8 +15,8 @@
 - `npm run check` — build, tests, typecheck and package lint; run before every commit.
 - `npm test` — builds first: the suites also run against `dist/`, and `test/types*.check.*` typecheck the
   shipped declarations.
-- `npm run bench -- legacy|current [--compare bench/baseline.json]` — wall time is dominated by one
-  `setTimeout` per lexer step; use `npm run bench:compute -- … --compare bench/baseline-compute.json` to
+- `npm run bench -- legacy|current [--compare bench/baseline.json]` — legacy's wall time is dominated by
+  one `setTimeout` per lexer step (current yields every ~8 ms); use `npm run bench:compute -- … --compare bench/baseline-compute.json` to
   judge compute changes. CPU time under real timers drifts between sessions; compare interleaved runs.
 
 ## Layout notes

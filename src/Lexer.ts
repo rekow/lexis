@@ -18,6 +18,13 @@ export type Source = string | string[];
 
 const noop = (): void => {};
 
+/**
+ * Longest stretch of lexing work, in ms, before yielding to the event loop so lexing a large source
+ * doesn't block it. The clock is only read every {@link CHECK_EVERY} steps, to keep it cheap.
+ */
+const SLICE_MS = 8;
+const CHECK_EVERY = 256;
+
 export class Lexer {
   lexicon!: Lexicon | null;
   source!: Source | null;
@@ -134,16 +141,20 @@ export class Lexer {
   }
 
   /**
-   * Steps the lexer, one step per turn of the event loop, until it finishes or is reset.
+   * Steps the lexer until it finishes or is reset, yielding to the event loop every {@link SLICE_MS}.
    */
   protected run(): void {
     const result = this._result;
+    const deadline = Date.now() + SLICE_MS;
 
-    if (this.step()) {
-      setTimeout(() => {
-        if (this._result === result)
-          this.run();
-      }, 0);
+    for (let steps = 1; this.step(); steps++) {
+      if (steps % CHECK_EVERY === 0 && Date.now() >= deadline) {
+        setTimeout(() => {
+          if (this._result === result)
+            this.run();
+        }, 0);
+        return;
+      }
     }
   }
 

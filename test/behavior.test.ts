@@ -291,7 +291,7 @@ describe.each(impls)('$name', (impl: Impl) => {
       });
     });
 
-    describe('known bugs (pinned, fixed after review)', () => {
+    describe('bugs fixed since 0.0.4 (still pinned for legacy)', () => {
       // Backtracking only rewinds one character, so a longer failed lookahead is swallowed.
       bug('legacy')('backtracks more than one character', async () => {
         expect(tokensOf(await lex({ A: 'a', ABCD: 'abcd', B: 'b', C: 'c' }, 'abc'))).toEqual([

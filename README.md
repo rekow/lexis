@@ -73,13 +73,21 @@ try {
   throw error;
 }
 ```
-To lex another source with the same `Lexer`, call `lexer.reset(true)` first; `true` keeps the current lexicon.
+To lex another source with the same `Lexer`, call `lexer.lex(source)` again: it starts over with the new source and the same lexicon. `lexer.lex()` with no source returns the current result. `lexer.reset()` clears the lexer, including its lexicon unless called as `reset(true)`; resetting, or passing a new source, before a lex finishes rejects that lex's promise with a `LexError`.
 
 ## Upgrading from 0.0.x
 - `lexer.lex()` returns a native `Promise` instead of a `Future`. Replace `.then(function (tokens, error) { ... })` with `await` (or `.then(onTokens, onError)`); errors arrive as a rejection rather than as a second callback argument with falsy `tokens`.
 - `lexis.Future` has been removed. Use native promises (for example `await new Promise((resolve) => setTimeout(resolve, 1000))` in place of a manually fulfilled `Future`).
 - `LexError` now extends `Error`, so `error instanceof Error` is `true` and works in every engine.
 - The prebuilt `dist/lexis.min.js`, the `window.lexis` global and AMD `define('lexis')` are gone. In the browser, import `lexis` through your bundler.
+- `lexer.lex(source)` can be called again on a used `Lexer` and lexes the new source; `reset(true)` is no longer needed first. `lexer.lex()` without a source returns the existing result instead of re-running the last step.
+
+Bug fixes that can change results:
+- Backtracking: when a longer simple rule matched part of the input and then failed, the lexer re-read only the last character, merging the rest into the previous token. It now backs up to the end of the longest match, so `{ A: 'a', ABCD: 'abcd', B: 'b', C: 'c' }` lexes `abc` as `A`, `B`, `C` instead of `A<"abc">`.
+- A partial simple match fails as soon as no rule can continue it ("Unrecognized token"); simple rules were kept alive while their source merely *contained* the input, so 0.0.x read further and sometimes reported "Unexpected end of input" instead.
+- Backslashes in simple rules are matched literally: `'\\'` no longer throws and `'a\\d'` no longer matches `a1`.
+- `lex('')` resolves to just `EOF`, and lexing without a lexicon rejects with a `LexError` instead of throwing a `TypeError`.
+- If rules passed to `setLexicon()` fail to compile, the error is recorded and the previous lexicon is kept, rather than storing the raw rules map.
 
 ## API
 - `lexis(lexicon?)` → `Lexer`. Also exposes `lexis.Lexer`, `lexis.Lexicon`, `lexis.Token` and `lexis.LexError`.

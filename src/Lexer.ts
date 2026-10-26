@@ -227,11 +227,13 @@ export class Lexer {
         for (const rule of this._valid) {
           const whole = matchesWhole(rule, str);
 
+          // Lists are usually one or two rules; a literal is allocated at exactly that size, where
+          // pushing to [] grows a much larger backing store.
           if (whole)
-            (match === EMPTY ? (match = []) : match).push(rule);
+            match === EMPTY ? (match = [rule]) : match.push(rule);
 
           if (rule.complex ? whole : rule.source.startsWith(str))
-            (valid === EMPTY ? (valid = []) : valid).push(rule);
+            valid === EMPTY ? (valid = [rule]) : valid.push(rule);
         }
 
         this._match = match;

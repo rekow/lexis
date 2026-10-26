@@ -265,6 +265,56 @@ describe.each(impls)('$name', (impl: Impl) => {
       expect([lexer.lexicon, lexer.source, lexer.error, lexer.tokens]).toEqual([null, null, null, []]);
     });
 
+    // The lexer has faster equivalents of the stock Lexicon methods, used only when they aren't overridden.
+    describe('with Lexicon methods overridden', () => {
+      // `lexis` is untyped; subclasses of an `any` base would take no constructor arguments.
+      const Lexicon: new (rules?: object) => Record<string, any> = lexis.Lexicon;
+
+      it('uses an overridden match()', async () => {
+        class LastMatch extends Lexicon {
+          match(rules: unknown, str: string) {
+            return super.match(rules, str).reverse();
+          }
+        }
+        const rules = { A: 'RE::a+', B: 'RE::[ab]+' };
+        expect(tokensOf(await lex(rules, 'aa'))).toEqual(['A<"aa">:1', 'EOF<"">:1']);
+        expect(tokensOf(await lex(new LastMatch(rules), 'aa'))).toEqual(['B<"aa">:1', 'EOF<"">:1']);
+      });
+
+      it('uses an overridden filter()', async () => {
+        class NoLookahead extends Lexicon {
+          filter() {
+            return [];
+          }
+        }
+        expect(tokensOf(await lex(new NoLookahead({ A: 'RE::a+' }), 'aa'))).toEqual([
+          'A<"a">:1',
+          'A<"a">:1',
+          'EOF<"">:1',
+        ]);
+      });
+
+      it('uses a filter() replaced on the instance', async () => {
+        const lexicon = new lexis.Lexicon({ A: 'RE::a+' });
+        lexicon.filter = () => [];
+        expect(tokensOf(await lex(lexicon, 'aa'))).toEqual(['A<"a">:1', 'A<"a">:1', 'EOF<"">:1']);
+      });
+
+      it('uses an overridden getRules()', async () => {
+        const ANY = { type: 'ANY', source: 'RE::.', matcher: /./, complex: true };
+        class Fallback extends Lexicon {
+          getRules(str: string | null) {
+            return super.getRules(str).concat(ANY);
+          }
+        }
+        expect(tokensOf(await lex(new Fallback({ A: 'a' }), 'a?'))).toEqual([
+          'A<"a">:1',
+          'ANY<"?">:1',
+          'EOF<"">:1',
+        ]);
+      });
+    });
+
     describe('errors', () => {
       it('fails when no rule can start with a character', async () => {
         const error = errorOf(await lex({ A: 'a' }, 'a\nax'));

@@ -4,7 +4,7 @@
  */
 
 import { LexError } from './LexError';
-import { Lexicon, type Rule, type Rules } from './Lexicon';
+import { Lexicon, matchesWhole, type Rule, type Rules } from './Lexicon';
 import { LINEBREAK } from './matchers';
 import { Token } from './Token';
 
@@ -24,6 +24,17 @@ const noop = (): void => {};
  */
 const SLICE_MS = 8;
 const CHECK_EVERY = 256;
+
+/** Shared empty rule list; the lexer only ever replaces its rule lists, never mutates them. */
+const EMPTY: Rule[] = [];
+
+/**
+ * Whether a lexicon uses the stock {@link Lexicon#match} and {@link Lexicon#filter}, so the lexer can
+ * compute both in one pass of its own. If either is overridden, the lexer calls them instead.
+ */
+function stockMatching(lexicon: Lexicon): boolean {
+  return lexicon.match === Lexicon.prototype.match && lexicon.filter === Lexicon.prototype.filter;
+}
 
 export class Lexer {
   lexicon!: Lexicon | null;
@@ -204,10 +215,33 @@ export class Lexer {
 
       break;
 
-    case 2:
-      this._match = this.lexicon!.match(this._valid, this._current!);
-      this._valid = this.lexicon!.filter(this._valid, this._current!);
-      this._previous = this._previous || [];
+    case 2: {
+      const lexicon = this.lexicon!;
+      const str = this._current!;
+
+      if (stockMatching(lexicon)) {
+        // Lexicon#match() and Lexicon#filter() of the valid rules, in one pass.
+        let match = EMPTY;
+        let valid = EMPTY;
+
+        for (const rule of this._valid) {
+          const whole = matchesWhole(rule, str);
+
+          if (whole)
+            (match === EMPTY ? (match = []) : match).push(rule);
+
+          if (rule.complex ? whole : rule.source.startsWith(str))
+            (valid === EMPTY ? (valid = []) : valid).push(rule);
+        }
+
+        this._match = match;
+        this._valid = valid;
+      } else {
+        this._match = lexicon.match(this._valid, str);
+        this._valid = lexicon.filter(this._valid, str);
+      }
+
+      this._previous = this._previous || EMPTY;
       this._state = this._match.length ? 6 :
         this._valid.length ? 3 :
         this._previous.length ? 4 :
@@ -217,6 +251,7 @@ export class Lexer {
         this.error = new LexError('Unrecognized token: ' + current, this._lineno);
 
       break;
+    }
 
     case 3:
       next = this.read();
@@ -249,12 +284,12 @@ export class Lexer {
     case 6:
       this._previous = this._match;
       this._matched = this._current!;
-      this._match = [];
+      this._match = EMPTY;
       this._state = 3;
       break;
 
     case 7:
-      this._previous = [];
+      this._previous = EMPTY;
       this._current = '';
       this._state = 1;
       break;

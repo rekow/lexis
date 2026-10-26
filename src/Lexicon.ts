@@ -24,7 +24,7 @@ export interface Rule {
  * starts at 0 and spans <code>str</code>. A sticky copy tests only position 0 and allocates no match
  * array; its match at 0 is the same one <code>exec()</code> would find.
  */
-function matchesWhole(rule: Rule, str: string): boolean {
+export function matchesWhole(rule: Rule, str: string): boolean {
   const re = rule._whole ??= new RegExp(rule.matcher.source, rule.matcher.flags.replace(/[gy]/g, '') + 'y');
   re.lastIndex = 0;
   return re.test(str) && re.lastIndex === str.length;

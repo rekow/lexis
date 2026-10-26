@@ -36,6 +36,8 @@ export class Lexer {
   protected _stream!: string[];
   protected _lineno!: number;
   protected _state!: number | null;
+  /** Whether {@link Lexer#lex} has started stepping through the current source. */
+  protected _started!: boolean;
   protected _result!: Promise<Token[]>;
   protected _resolve!: (tokens: Token[]) => void;
   protected _reject!: (error: unknown) => void;
@@ -49,10 +51,17 @@ export class Lexer {
   }
 
   /**
-   * Resets the lexer state.
+   * Resets the lexer state. A lex still in progress stops, and its promise rejects with a
+   * {@link LexError}.
    * @param keepLexicon If true, will preserve the current lexicon.
    */
   reset(keepLexicon?: boolean): this {
+    // No-op if the lex already finished.
+    if (this._started)
+      this._reject(new LexError(
+        'Lexer.reset() or Lexer.lex(source) was called before lexing finished.',
+        this._lineno));
+
     this.init(keepLexicon === true ? this.lexicon ?? undefined : undefined);
     return this;
   }
@@ -104,14 +113,46 @@ export class Lexer {
 
   /**
    * Processes the input stream, matching and tokenizing left to right in a single pass.
-   * @param source String to set as source and lex.
-   * @return Resolves with the tokens, or rejects with the error that stopped lexing.
+   * @param source String to set as source and lex. Once lexing has started, passing a source
+   *   starts over with it, keeping the lexicon, as {@link Lexer#reset}<code>(true)</code> would.
+   * @return Resolves with the tokens, or rejects with the error that stopped lexing. Called again
+   *   without a source, returns the same promise.
    */
   lex(source?: Source): Promise<Token[]> {
-    let next: string | undefined;
+    if (typeof source === 'string' || Array.isArray(source)) {
+      if (this._started)
+        this.reset(true);
 
-    if (typeof source === 'string' || Array.isArray(source))
       this.setSource(source);
+    } else if (this._started) {
+      return this._result;
+    }
+
+    this._started = true;
+    this.run();
+    return this._result;
+  }
+
+  /**
+   * Steps the lexer, one step per turn of the event loop, until it finishes or is reset.
+   */
+  protected run(): void {
+    const result = this._result;
+
+    if (this.step()) {
+      setTimeout(() => {
+        if (this._result === result)
+          this.run();
+      }, 0);
+    }
+  }
+
+  /**
+   * Advances the lexer state machine by one step.
+   * @return False once lexing has finished or failed.
+   */
+  protected step(): boolean {
+    let next: string | undefined;
 
     if (this.source == null || !this.lexicon) {
       this.error = new LexError('Lexer.lex() cannot be called before source and lexicon are set.');
@@ -123,12 +164,12 @@ export class Lexer {
     switch (this._state) {
     case -1:
       this.fail();
-      return this._result;
+      return false;
 
     case 0:
       this.tokens.push(new Token('EOF', '', this._lineno));
       this._resolve(this.tokens);
-      return this._result;
+      return false;
 
     case 1:
       next = this.read();
@@ -212,11 +253,7 @@ export class Lexer {
       this._state = -1;
     }
 
-    setTimeout(() => {
-      this.lex();
-    }, 0);
-
-    return this._result;
+    return true;
   }
 
   /**
@@ -257,6 +294,7 @@ export class Lexer {
     this._stream = [];
     this._lineno = 0;
     this._state = null;
+    this._started = false;
     this._result = new Promise((resolve, reject) => {
       this._resolve = resolve;
       this._reject = reject;

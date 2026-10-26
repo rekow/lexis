@@ -9,6 +9,11 @@ import { impls, type Impl, type LexResult } from './impls';
 const README_RULES = { LPAREN: '(', RPAREN: ')', ALPHANUM: 'RE::[a-zA-Z0-9]+' };
 const WS_RULES = { ...README_RULES, WS: 'RE::[ \\t]+' };
 
+/** A source that is still being lexed when lex() returns. */
+const LONG = '(abc)'.repeat(50);
+/** Lets any steps already scheduled run. */
+const settled = () => new Promise((resolve) => setTimeout(resolve, 5));
+
 const tokensOf = (r: LexResult) => {
   if ('error' in r) throw new Error(`expected tokens, got error: ${r.error}`);
   return r.tokens;
@@ -24,6 +29,8 @@ describe.each(impls)('$name', (impl: Impl) => {
   /** Marks a test as a pinned known bug for the given implementation generations. */
   const bug = (...generations: Impl['generation'][]) =>
     generations.includes(impl.generation) ? it.fails : it;
+  /** For fixed bugs the legacy implementation can't run in-process. */
+  const skipLegacy = impl.generation === 'legacy' ? it.skip : it;
 
   describe('lexis()', () => {
     it('exposes the public classes on the namespace', () => {
@@ -369,10 +376,50 @@ describe.each(impls)('$name', (impl: Impl) => {
 
       // Legacy returns the previous result, then crashes the process with an uncaught TypeError
       // when it re-fulfills the Future, so it can't run in-process.
-      (impl.generation === 'legacy' ? it.skip : it.fails)('lexes again without reset()', async () => {
+      skipLegacy('lexes again without reset()', async () => {
         const lexer = lexis(README_RULES);
-        await impl.lex(lexer, 'a');
+        const first = tokensOf(await impl.lex(lexer, 'a'));
         expect(tokensOf(await impl.lex(lexer, 'b'))).toEqual(['ALPHANUM<"b">:1', 'EOF<"">:1']);
+        expect(first).toEqual(['ALPHANUM<"a">:1', 'EOF<"">:1']);
+      });
+
+      skipLegacy('lexes again after a failed lex without reset()', async () => {
+        const lexer = lexis(README_RULES);
+        errorOf(await impl.lex(lexer, '(x!'));
+        expect(tokensOf(await impl.lex(lexer, 'b'))).toEqual(['ALPHANUM<"b">:1', 'EOF<"">:1']);
+        expect(lexer.error).toBeNull();
+      });
+
+      // Legacy started another step chain while lexing, and appended another EOF once done.
+      skipLegacy('returns the same promise from lex() without a source', async () => {
+        const lexer = lexis(README_RULES);
+        const result = lexer.lex('(a)');
+        expect(lexer.lex()).toBe(result);
+        const tokens = await result;
+        expect(lexer.lex()).toBe(result);
+        await settled();
+        expect(tokens.map(String)).toEqual(['LPAREN<"(">:1', 'ALPHANUM<"a">:1', 'RPAREN<")">:1', 'EOF<"">:1']);
+      });
+
+      // Legacy kept stepping the old lex against the reset state and failed the next lex.
+      skipLegacy('stops an unfinished lex on reset(), rejecting its promise', async () => {
+        const lexer = lexis(README_RULES);
+        const first = impl.lex(lexer, LONG);
+        lexer.reset(true);
+        const error = errorOf(await first);
+        expect(error).toBeInstanceOf(lexis.LexError);
+        expect(error.message).toBe('Lexer.reset() or Lexer.lex(source) was called before lexing finished.');
+        await settled();
+        expect([lexer.error, lexer.tokens]).toEqual([null, []]);
+        expect(tokensOf(await impl.lex(lexer, '(b)'))).toEqual(['LPAREN<"(">:1', 'ALPHANUM<"b">:1', 'RPAREN<")">:1', 'EOF<"">:1']);
+      });
+
+      skipLegacy('starts over when given a new source while lexing', async () => {
+        const lexer = lexis(README_RULES);
+        const first = impl.lex(lexer, LONG);
+        const second = impl.lex(lexer, '(b)');
+        expect(errorOf(await first)).toBeInstanceOf(lexis.LexError);
+        expect(tokensOf(await second)).toEqual(['LPAREN<"(">:1', 'ALPHANUM<"b">:1', 'RPAREN<")">:1', 'EOF<"">:1']);
       });
     });
   });

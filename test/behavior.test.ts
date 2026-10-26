@@ -317,8 +317,14 @@ describe.each(impls)('$name', (impl: Impl) => {
         ]);
       });
 
-      bug('legacy', 'current')('lexes an empty string to just EOF', async () => {
+      bug('legacy')('lexes an empty string to just EOF', async () => {
         expect(tokensOf(await lex(README_RULES, ''))).toEqual(['EOF<"">:1']);
+      });
+
+      bug('legacy')('lexes an empty source given to the constructor', async () => {
+        const lexer = new lexis.Lexer(README_RULES, '');
+        expect(lexer.source).toBe('');
+        expect(tokensOf(await impl.lex(lexer))).toEqual(['EOF<"">:1']);
       });
 
       // Legacy throws a TypeError synchronously from lex().

@@ -113,7 +113,7 @@ export class Lexer {
     if (typeof source === 'string' || Array.isArray(source))
       this.setSource(source);
 
-    if (!(this.source && this._lines && this._stream)) {
+    if (this.source == null) {
       this.error = new LexError('Lexer.lex() cannot be called before source and lexicon are set.');
       this._state = -1;
     }
@@ -269,7 +269,7 @@ export class Lexer {
     if (lexicon)
       this.setLexicon(lexicon);
 
-    if (source)
+    if (source != null)
       this.setSource(source);
   }
 }

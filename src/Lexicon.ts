@@ -17,6 +17,14 @@ export interface Rule {
   complex: boolean;
 }
 
+/**
+ * Whether a rule matches the whole of <code>str</code>.
+ */
+function matchesWhole(rule: Rule, str: string): boolean {
+  const matches = rule.matcher.exec(str);
+  return matches !== null && matches[0].length === str.length;
+}
+
 export class Lexicon {
   /**
    * Rules bucketed by first character; complex (RegExp) rules live under <code>RE</code>.
@@ -84,7 +92,7 @@ export class Lexicon {
    */
   filter(rules: Rule[] | null, str: string): Rule[] {
     return (rules || this.getRules(str)).filter((rule) =>
-      rule.complex ? this.match([rule], str).length > 0 : rule.source.startsWith(str));
+      rule.complex ? matchesWhole(rule, str) : rule.source.startsWith(str));
   }
 
   /**
@@ -94,9 +102,6 @@ export class Lexicon {
    * @returns List of exactly-matching tokens.
    */
   match(rules: Rule[] | null, str: string): Rule[] {
-    return (rules || this.getRules(str)).filter((rule) => {
-      const matches = rule.matcher.exec(str);
-      return matches !== null && matches[0].length === str.length;
-    });
+    return (rules || this.getRules(str)).filter((rule) => matchesWhole(rule, str));
   }
 }

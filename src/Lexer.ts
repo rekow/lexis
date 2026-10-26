@@ -37,14 +37,12 @@ function stockMatching(lexicon: Lexicon): boolean {
 }
 
 /**
- * Whether the lexer can take a lexicon's rules for a character from {@link Lexicon#candidates} instead
- * of {@link Lexicon#getRules}: only if both are stock, and so is matching, so that an override is
- * never handed the shared list.
+ * Whether a lexicon uses the stock {@link Lexicon#getRules}, so the lexer can take a character's rules
+ * from {@link Lexicon#candidates} instead. If it's overridden, the lexer calls it instead.
  */
 function stockRules(lexicon: Lexicon): boolean {
   return lexicon.getRules === Lexicon.prototype.getRules &&
-    lexicon.candidates === Lexicon.prototype.candidates &&
-    stockMatching(lexicon);
+    lexicon.candidates === Lexicon.prototype.candidates;
 }
 
 export class Lexer {
@@ -67,6 +65,12 @@ export class Lexer {
   protected _state!: number | null;
   /** Whether {@link Lexer#lex} has started stepping through the current source. */
   protected _started!: boolean;
+  /**
+   * Whether the lexicon's matching, and its rule lookup, are stock, so that steps can use the lexer's
+   * own faster equivalents. Checked at the start of each {@link Lexer#run} slice and false outside one.
+   */
+  protected _stockMatching!: boolean;
+  protected _stockRules!: boolean;
   protected _result!: Promise<Token[]>;
   protected _resolve!: (tokens: Token[]) => void;
   protected _reject!: (error: unknown) => void;
@@ -168,15 +172,25 @@ export class Lexer {
   protected run(): void {
     const result = this._result;
     const deadline = Date.now() + SLICE_MS;
+    const lexicon = this.lexicon;
 
-    for (let steps = 1; this.step(); steps++) {
-      if (steps % CHECK_EVERY === 0 && Date.now() >= deadline) {
-        setTimeout(() => {
-          if (this._result === result)
-            this.run();
-        }, 0);
-        return;
+    // Nothing outside the lexer runs during a slice, so the lexicon and its methods can't change.
+    // The shared rule lists are only used with stock matching, so an override never sees them.
+    this._stockMatching = lexicon !== null && stockMatching(lexicon);
+    this._stockRules = this._stockMatching && stockRules(lexicon!);
+
+    try {
+      for (let steps = 1; this.step(); steps++) {
+        if (steps % CHECK_EVERY === 0 && Date.now() >= deadline) {
+          setTimeout(() => {
+            if (this._result === result)
+              this.run();
+          }, 0);
+          return;
+        }
       }
+    } finally {
+      this._stockMatching = this._stockRules = false;
     }
   }
 
@@ -218,7 +232,7 @@ export class Lexer {
       }
 
       this._current = current + next;
-      this._valid = stockRules(this.lexicon!) ?
+      this._valid = this._stockRules ?
         this.lexicon!.candidates(next) :
         this.lexicon!.getRules(next);
       this._state = this._valid.length ? 2 : -1;
@@ -232,7 +246,7 @@ export class Lexer {
       const lexicon = this.lexicon!;
       const str = this._current!;
 
-      if (stockMatching(lexicon)) {
+      if (this._stockMatching) {
         // Lexicon#match() and Lexicon#filter() of the valid rules, in one pass.
         let match = EMPTY;
         let valid = EMPTY;
@@ -356,6 +370,8 @@ export class Lexer {
     this._lineno = 0;
     this._state = null;
     this._started = false;
+    this._stockMatching = false;
+    this._stockRules = false;
     this._result = new Promise((resolve, reject) => {
       this._resolve = resolve;
       this._reject = reject;

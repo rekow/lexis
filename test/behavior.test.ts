@@ -300,6 +300,17 @@ describe.each(impls)('$name', (impl: Impl) => {
         expect(tokensOf(await lex(lexicon, 'aa'))).toEqual(['A<"a">:1', 'A<"a">:1', 'EOF<"">:1']);
       });
 
+      skipLegacy('uses an override made while lexing from the next slice on', async () => {
+        slowClock();
+        const lexicon = new lexis.Lexicon({ A: 'RE::a+' });
+        const result = lexis(lexicon).lex('a'.repeat(1000));
+        lexicon.filter = () => [];
+        const values = (await result).slice(0, -1).map((token: { value: string }) => token.value);
+        expect(values[0].length).toBeGreaterThan(1);
+        expect(values.slice(1).every((value: string) => value === 'a')).toBe(true);
+        expect(values.join('')).toBe('a'.repeat(1000));
+      });
+
       it('uses an overridden getRules()', async () => {
         const ANY = { type: 'ANY', source: 'RE::.', matcher: /./, complex: true };
         class Fallback extends Lexicon {

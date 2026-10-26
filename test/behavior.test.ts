@@ -328,8 +328,10 @@ describe.each(impls)('$name', (impl: Impl) => {
       });
 
       // Legacy throws a TypeError synchronously from lex().
-      bug('legacy', 'current')('fails with a LexError when no lexicon is set', async () => {
-        expect(errorOf(await lex(undefined, 'a'))).toBeInstanceOf(lexis.LexError);
+      bug('legacy')('fails with a LexError when no lexicon is set', async () => {
+        const error = errorOf(await lex(undefined, 'a'));
+        expect(error).toBeInstanceOf(lexis.LexError);
+        expect(error.message).toBe('Lexer.lex() cannot be called before source and lexicon are set.');
       });
 
       // `matchers.escape` does not escape `\`, so the rule's RegExp throws during define().
@@ -349,10 +351,12 @@ describe.each(impls)('$name', (impl: Impl) => {
       });
 
       // Legacy stores the raw rules map as the lexicon.
-      bug('legacy')('keeps no lexicon when the rules fail to compile', () => {
+      bug('legacy')('keeps no lexicon when the rules fail to compile', async () => {
         const lexer = lexis({ BAD: 'RE::(' });
-        expect(lexer.error).toBeInstanceOf(SyntaxError);
+        const error = lexer.error;
+        expect(error).toBeInstanceOf(SyntaxError);
         expect(lexer.lexicon).toBeNull();
+        expect(errorOf(await impl.lex(lexer, 'a'))).toBe(error);
       });
 
       bug('legacy')('keeps the previous lexicon when new rules fail to compile', () => {

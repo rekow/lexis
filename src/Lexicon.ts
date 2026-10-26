@@ -1,0 +1,162 @@
+/**
+ * @file Lexicon class - describes rules for matching tokens.
+ * @author David Rekow <d@davidrekow.com>
+ */
+
+import { COMPLEX, escape } from './matchers';
+
+/**
+ * Rules map of token types to matcher strings. See {@link Lexicon#define} for details.
+ */
+export type Rules = Record<string, string>;
+
+export interface Rule {
+  source: string;
+  type: string;
+  matcher: RegExp;
+  complex: boolean;
+  /** @internal Sticky copy of <code>matcher</code>, created on first use. */
+  _whole?: RegExp;
+}
+
+/**
+ * Whether a rule matches the whole of <code>str</code>: the leftmost match of <code>rule.matcher</code>
+ * starts at 0 and spans <code>str</code>. A sticky copy tests only position 0 and allocates no match
+ * array; its match at 0 is the same one <code>exec()</code> would find.
+ */
+export function matchesWhole(rule: Rule, str: string): boolean {
+  const re = rule._whole ??= new RegExp(rule.matcher.source, rule.matcher.flags.replace(/[gy]/g, '') + 'y');
+  re.lastIndex = 0;
+  return re.test(str) && re.lastIndex === str.length;
+}
+
+/**
+ * A cached {@link Lexicon#candidates} list, with the rule lists it was built from and their lengths
+ * at the time, to tell when it's stale.
+ */
+interface Candidates {
+  bucket: Rule[];
+  bucketLength: number;
+  complex: Rule[];
+  complexLength: number;
+  rules: Rule[];
+}
+
+export class Lexicon {
+  /**
+   * Rules bucketed by first character; complex (RegExp) rules live under <code>RE</code>.
+   */
+  protected rules: { RE: Rule[]; [key: string]: Rule[] };
+
+  /** @internal Cached {@link Lexicon#candidates} lists by character. */
+  protected _candidates: Map<string, Candidates>;
+
+  /**
+   * @param rules Rules map. See {@link Lexicon#define} for details.
+   */
+  constructor(rules?: Rules) {
+    this.rules = { RE: [] };
+    this._candidates = new Map();
+
+    if (rules)
+      this.define(rules);
+  }
+
+  /**
+   * Defines the token rules for this <code>Lexicon</code>.
+   * @param rules The rules for the lexicon as a map of token names to string sources
+   *   to directly match. To perform more complex regex matching, pass <code>RegExp</code> sources
+   *   prefixed with <code>RE::</code> (make sure to escape backslashes for special characters):
+   * <pre><code>{
+   *   OPEN_TAG: '<',         // Matches `<` exactly.
+   *   DIGIT:    'RE::\\d',    // Matches a single digit.
+   *   ALPHANUM: 'RE::\\w+'    // Matches alphanumeric text greedily.
+   * }</code></pre>
+   */
+  define(rules: Rules): void {
+    for (const type in rules) {
+      if (Object.prototype.hasOwnProperty.call(rules, type)) {
+        const src = rules[type]!;
+        let key: string;
+        let rule: Rule;
+
+        if (COMPLEX.test(src)) {
+          rule = { source: src, type, matcher: new RegExp(src.slice(4)), complex: true };
+          key = 'RE';
+        } else {
+          rule = { source: src, type, matcher: new RegExp(escape(src)), complex: false };
+          key = src.charAt(0);
+        }
+
+        (this.rules[key] ??= []).push(rule);
+      }
+    }
+  }
+
+  /**
+   * Returns the full set of potentially-matching token rules for a string.
+   * @param str String to find all potential matches for.
+   * @return Set of potentially-matching token rules.
+   */
+  getRules(str: string | null): Rule[] {
+    if (!str)
+      return [];
+
+    return (this.rules[str.charAt(0)] || []).concat(this.rules.RE);
+  }
+
+  /**
+   * @internal Like {@link Lexicon#getRules} for one character, without building a new list each time:
+   * returns a cached or shared list that must not be modified. A cached list is rebuilt when the rule
+   * lists it came from are replaced or change length, as define() does; other in-place changes to
+   * <code>rules</code> aren't seen.
+   */
+  candidates(char: string): Rule[] {
+    const bucket = this.rules[char];
+    const complex = this.rules.RE;
+
+    if (!bucket)
+      return complex;
+
+    if (!complex.length)
+      return bucket;
+
+    let cached = this._candidates.get(char);
+
+    if (!cached ||
+        cached.bucket !== bucket || cached.bucketLength !== bucket.length ||
+        cached.complex !== complex || cached.complexLength !== complex.length) {
+      cached = {
+        bucket,
+        bucketLength: bucket.length,
+        complex,
+        complexLength: complex.length,
+        rules: bucket.concat(complex),
+      };
+      this._candidates.set(char, cached);
+    }
+
+    return cached.rules;
+  }
+
+  /**
+   * Filters the set of potential token rules for future or current matches.
+   * @param rules If passed, filter this instead of current Lexicon.
+   * @param str String to find future and current matches for.
+   * @return List of eventually-matching token rules.
+   */
+  filter(rules: Rule[] | null, str: string): Rule[] {
+    return (rules || this.getRules(str)).filter((rule) =>
+      rule.complex ? matchesWhole(rule, str) : rule.source.startsWith(str));
+  }
+
+  /**
+   * Like filter, but returns only current matches.
+   * @param rules If passed, filter this instead of current Lexicon.
+   * @param str String to find current token matches for.
+   * @returns List of exactly-matching tokens.
+   */
+  match(rules: Rule[] | null, str: string): Rule[] {
+    return (rules || this.getRules(str)).filter((rule) => matchesWhole(rule, str));
+  }
+}

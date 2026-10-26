@@ -1,29 +1,66 @@
 {
   "name": "lexis",
   "description": "a very simple lexer",
-  "version": "0.0.4",
+  "version": "0.1.0",
   "license": "MIT",
   "author": {
     "name": "David Rekow",
     "email": "d@davidrekow.com",
     "url": "http://davidrekow.com"
   },
-  "keywords": ["lex", "lexer", "lexis", "token", "tokenize", "tokens"],
-  "homepage": "https://github.com/davidrekow/lexis",
-  "bugs": "https://github.com/davidrekow/lexis/issues",
+  "keywords": [
+    "lex",
+    "lexer",
+    "lexis",
+    "token",
+    "tokenize",
+    "tokens"
+  ],
+  "homepage": "https://github.com/rekow/lexis",
+  "bugs": "https://github.com/rekow/lexis/issues",
   "repository": {
     "type": "git",
-    "url": "https://github.com/davidrekow/lexis.git"
+    "url": "git+https://github.com/rekow/lexis.git"
   },
-  "main": "src/index.js",
+  "type": "commonjs",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "test": "make test"
+    "build": "tsdown",
+    "typecheck": "tsc -p . && tsc -p test",
+    "pretest": "npm run -s build",
+    "test": "vitest run",
+    "check": "npm test && npm run -s typecheck && npm run -s check:package",
+    "check:package": "publint && attw --pack .",
+    "prepack": "npm run -s build"
   },
   "engines": {
-    "node": "0.10.x"
+    "node": ">=18"
   },
   "devDependencies": {
-    "closure-compiler-stream": "0.1"
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@types/node": "^26.6.5",
+    "publint": "^0.3.25",
+    "tsdown": "^0.23.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
   }
 }
-

@@ -50,8 +50,6 @@
     "test": "vitest run",
     "check": "npm test && npm run -s typecheck && npm run -s check:package",
     "check:package": "publint && attw --pack .",
-    "bench": "node --expose-gc bench/run.mjs",
-    "bench:compute": "node --expose-gc bench/run.mjs --fake-timers",
     "prepack": "npm run -s build"
   },
   "engines": {

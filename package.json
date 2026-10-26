@@ -16,11 +16,11 @@
     "tokenize",
     "tokens"
   ],
-  "homepage": "https://github.com/davidrekow/lexis",
-  "bugs": "https://github.com/davidrekow/lexis/issues",
+  "homepage": "https://github.com/rekow/lexis",
+  "bugs": "https://github.com/rekow/lexis/issues",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/davidrekow/lexis.git"
+    "url": "git+https://github.com/rekow/lexis.git"
   },
   "type": "commonjs",
   "sideEffects": false,

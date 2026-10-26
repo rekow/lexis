@@ -89,18 +89,16 @@ export class Lexer {
     if (!lexicon) {
       this.error = new LexError('Lexer.setLexicon() expects an object or instance of Lexicon.');
       this.fail();
+    } else if (lexicon instanceof Lexicon) {
+      this.lexicon = lexicon;
     } else {
-      if (!(lexicon instanceof Lexicon)) {
-        try {
-          lexicon = new Lexicon(lexicon);
-        } catch (e) {
-          this.error = e as Error;
-          this.fail();
-        }
+      // On failure, the previous lexicon (if any) is kept.
+      try {
+        this.lexicon = new Lexicon(lexicon);
+      } catch (e) {
+        this.error = e as Error;
+        this.fail();
       }
-
-      // Known bug, kept from the original: if construction threw, this stores the raw rules map.
-      this.lexicon = lexicon as Lexicon;
     }
   }
 

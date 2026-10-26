@@ -327,8 +327,34 @@ describe.each(impls)('$name', (impl: Impl) => {
       });
 
       // `matchers.escape` does not escape `\`, so the rule's RegExp throws during define().
-      bug('legacy', 'current')('supports a backslash in a simple rule', async () => {
+      bug('legacy')('supports a backslash in a simple rule', async () => {
         expect(tokensOf(await lex({ BS: '\\' }, '\\'))).toEqual(['BS<"\\">:1', 'EOF<"">:1']);
+      });
+
+      // Unescaped, `a\d` compiled to /a\d/ and matched 'a1'.
+      bug('legacy')('matches a backslash in a simple rule literally', async () => {
+        const rules = { AD: 'a\\d', A: 'a', D: 'RE::\\d' };
+        expect(tokensOf(await lex(rules, 'a\\da1'))).toEqual([
+          'AD<"a\\d">:1',
+          'A<"a">:1',
+          'D<"1">:1',
+          'EOF<"">:1',
+        ]);
+      });
+
+      // Legacy stores the raw rules map as the lexicon.
+      bug('legacy')('keeps no lexicon when the rules fail to compile', () => {
+        const lexer = lexis({ BAD: 'RE::(' });
+        expect(lexer.error).toBeInstanceOf(SyntaxError);
+        expect(lexer.lexicon).toBeNull();
+      });
+
+      bug('legacy')('keeps the previous lexicon when new rules fail to compile', () => {
+        const lexer = lexis(README_RULES);
+        const lexicon = lexer.lexicon;
+        lexer.setLexicon({ BAD: 'RE::(' });
+        expect(lexer.error).toBeInstanceOf(SyntaxError);
+        expect(lexer.lexicon).toBe(lexicon);
       });
 
       // Legacy returns the previous result, then crashes the process with an uncaught TypeError

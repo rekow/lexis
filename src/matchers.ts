@@ -16,7 +16,7 @@ export const COMPLEX: RegExp = /^RE::(.*)$/;
 /**
  * List of special RegExp characters to escape.
  */
-export const SPECIAL: readonly string[] = ['/', '{', '}', '(', ')', '[', ']', '^', '$', ',', '.', '+', '?', '*', '|'];
+export const SPECIAL: readonly string[] = ['\\', '/', '{', '}', '(', ')', '[', ']', '^', '$', ',', '.', '+', '?', '*', '|'];
 
 /**
  * Escapes a string and returns a version safe for passing to <code>RegExp()</code>.
